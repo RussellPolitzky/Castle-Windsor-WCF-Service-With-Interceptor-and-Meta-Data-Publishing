@@ -3,7 +3,6 @@ using System.ServiceModel;
 using System.ServiceModel.Description;
 using System.Threading;
 using Castle.Core;
-using Castle.DynamicProxy;
 using Castle.Facilities.WcfIntegration;
 using Castle.MicroKernel.Registration;
 using Castle.Windsor;
@@ -20,6 +19,13 @@ namespace UsingCastlesWcfFacility
         private const string BaseAddress = "http://localhost:8000/Operations.svc";
         private const string RelativeAddress = "Operations";
         private const int Expected = 42;
+
+
+        [SetUp]
+        public void Setup()
+        {
+            TestInterceptor.mostRecentMethodCallIntercepoted = string.Empty;
+        }
 
 
         /// <summary>
@@ -113,7 +119,7 @@ namespace UsingCastlesWcfFacility
                             .DependsOn(new { value = Expected }) // Notice how this constant is injected in to the service.
                             .AsWcfService(
                                 new DefaultServiceModel()
-                //.OpenEagerly() // This is useful to force immediate creation of services and to see any errors that may result.
+                                    //.OpenEagerly() // This is useful to force immediate creation of services and to see any errors that may result.
                                     .AddBaseAddresses(BaseAddress)
                                     .AddEndpoints(
                                         WcfEndpoint.ForContract<IOperations>()
@@ -157,6 +163,7 @@ namespace UsingCastlesWcfFacility
                 new WindsorContainer()
                     .AddFacility<WcfFacility>(f => f.CloseTimeout = TimeSpan.Zero)
                     .Register(
+                        Component.For<TestInterceptor>(), // The interceptor must be registered like this.
 
                         Component.For<IServiceBehavior>().Instance(returnFaults),
                         Component.For<IServiceBehavior>().Instance(metadata),
@@ -164,8 +171,8 @@ namespace UsingCastlesWcfFacility
                         Component
                             .For<IOperations>()
                             .ImplementedBy<Operations>()
-                            //.Interceptors(InterceptorReference.ForType<>())
-                            .DependsOn(new { value = Expected }) // Notice how this constant is injected in to the service.
+                            .Interceptors(InterceptorReference.ForType<TestInterceptor>()).Anywhere  // Don't care what order this is called in (and there is only one interceptor on this any case).
+                            .DependsOn(new { value = Expected })                                    // Notice how this constant is injected in to the service.
                             .AsWcfService(
                                 new DefaultServiceModel()
                                     //.OpenEagerly() // This is useful to force immediate creation of services and to see any errors that may result.
@@ -181,7 +188,7 @@ namespace UsingCastlesWcfFacility
                 // This sleep is useful if/when you'd like to browse to http://localhost:8000/Operations.svc
                 // to verify that meta-data is being published for this service.
 
-                Thread.Sleep(100000);
+                //Thread.Sleep(100000);
 
                 // Notice that we're using the standard WCF channel factory here,
                 // rather than the castle proxies.
@@ -193,29 +200,9 @@ namespace UsingCastlesWcfFacility
                 int result = client.GetValueFromConstructor();
 
                 Assert.AreEqual(Expected, result);
+
+                Assert.That(TestInterceptor.mostRecentMethodCallIntercepoted, Is.EqualTo("GetValueFromConstructor"));
             }
         }
     }
-
-
-
-
-
-    public class TestInterceptor : IInterceptor
-    {
-        public void Intercept(IInvocation invocation)
-        {
-            // Trace log the name of the method that's about to be called.
-            string nameOfMethodToBeCalled = invocation.MethodInvocationTarget.Name;
-
-            Console.WriteLine("Method {0} is about to be called.", nameOfMethodToBeCalled);
-
-            invocation.Proceed(); //
-        }
-    }
-
-
-
-
-
 }

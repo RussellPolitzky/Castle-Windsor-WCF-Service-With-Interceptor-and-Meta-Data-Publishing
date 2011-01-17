@@ -58,6 +58,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TestInterceptor.cs" />
     <Compile Include="When_using_castle_wcf_facility.cs" />
     <Compile Include="IOperations.cs" />
     <Compile Include="Operations.cs" />
