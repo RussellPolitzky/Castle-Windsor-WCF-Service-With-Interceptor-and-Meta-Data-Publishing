@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ServiceModel;
+using System.ServiceModel.Channels;
 using System.ServiceModel.Description;
 using System.Threading;
 using Castle.Core;
@@ -35,28 +37,29 @@ namespace UsingCastlesWcfFacility
         [Test]
         public void should_be_able_to_host_a_wcf_service_in_the_container()
         {
-
             // The container is used in a using block
             // so that all resources are cleaned up when it's disposed.
             using (
                 new WindsorContainer()
-                    .AddFacility<WcfFacility>(f => f.CloseTimeout = TimeSpan.Zero) // Notice how it's possible to configure the facilityt here.  Usually, we don't add any extra config.
+                    .AddFacility<WcfFacility>(f => f.CloseTimeout = TimeSpan.Zero)
+                    // Notice how it's possible to configure the facilityt here.  Usually, we don't add any extra config.
                     .Register(
                         Component
                             .For<IOperations>()
                             .ImplementedBy<Operations>()
-                            .DependsOn(new { value = Expected }) // Notice how this constant is injected in to the service.
+                            .DependsOn(new {value = Expected})
+                            // Notice how this constant is injected in to the service.
                             .AsWcfService(
                                 new DefaultServiceModel()
-                //.OpenEagerly()           // This is useful to force immediate creation
-                // of services and to see any errors that may result.
+                                    .OpenEagerly() // This is useful to force immediate creation
+                                    // of services and to see any errors that may result.
                                     .AddBaseAddresses(BaseAddress)
                                     .AddEndpoints(
                                         WcfEndpoint.ForContract<IOperations>()
-                                            .BoundTo(new WSHttpBinding())
-                                            .At(RelativeAddress)
+                                                   .BoundTo(new WSHttpBinding())
+                                                   .At(RelativeAddress)
                                     )
-                             )
+                            )
 
                     )
                 )
@@ -69,14 +72,30 @@ namespace UsingCastlesWcfFacility
                 // We're using the standard WCF channel factor here,
                 // rather than the Castle proxies [Just to show that 
                 // we're dealing with a standard WCF service.].
-                IOperations client = ChannelFactory<IOperations>.CreateChannel(
-                    new WSHttpBinding(),
-                    new EndpointAddress(BaseAddress + "/" + RelativeAddress)
-                    );
 
-                int result = client.GetValueFromConstructor();
+                List<IOperations> clients = new List<IOperations>();
 
-                Assert.AreEqual(Expected, result);
+                for (int i = 1; i < 10; i++)
+                {
+                    IOperations client = ChannelFactory<IOperations>.CreateChannel(
+                        new WSHttpBinding(),
+                        new EndpointAddress(BaseAddress + "/" + RelativeAddress)
+                        );
+
+                    clients.Add(client);
+
+                    int result2 = client.GetValueFromConstructor();
+                    Assert.AreEqual(Expected, result2);
+
+                    int result1 = client.GetValueFromConstructor();
+                    Assert.AreEqual(Expected, result1);
+                }
+
+// ReSharper disable SuspiciousTypeConversion.Global
+                clients.ForEach(client => (client as IChannel).Close() );
+// ReSharper restore SuspiciousTypeConversion.Global
+
+                Assert.That(Operations.NumberOfInstancesInstantiated, Is.EqualTo(1));
             }
         }
 

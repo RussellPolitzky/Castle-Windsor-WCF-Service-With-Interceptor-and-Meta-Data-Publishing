@@ -4,6 +4,8 @@ namespace UsingCastlesWcfFacility
 {
     public class Operations : IOperations
     {
+        public static int NumberOfInstancesInstantiated;
+
         private int _value;
 
         /// <summary>
@@ -15,6 +17,7 @@ namespace UsingCastlesWcfFacility
         public Operations(int value)
         {
             _value = value;
+            NumberOfInstancesInstantiated++;
         }
 
 
